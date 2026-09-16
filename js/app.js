@@ -258,7 +258,7 @@ function renderReportTable() {
         paginationControls = `<div class="pagination-controls flex justify-between items-center mt-4 pt-2 border-t border-gray-200 shrink-0"><span class="text-xs text-gray-500 font-bold">Halaman ${reportPage} dari ${totalPages || 1}</span><div class="flex gap-2"><button onclick="changeReportPage(-1)" class="px-3 py-1 border border-black rounded text-xs font-bold hover:bg-gray-200 disabled:opacity-50" ${reportPage === 1 ? 'disabled' : ''}>&lt; Prev</button><button onclick="changeReportPage(1)" class="px-3 py-1 border border-black rounded text-xs font-bold hover:bg-gray-200 disabled:opacity-50" ${reportPage >= totalPages ? 'disabled' : ''}>Next &gt;</button></div></div>`;
     }
 
-    const headerHtml = `<div class="mb-6 shrink-0 text-center md:text-left border-b-4 border-black pb-4"><h2 class="font-black text-4xl mb-1 uppercase text-bebyte-purple">Laporan Transaksi</h2><p class="text-sm font-bold text-gray-600">Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>${isPrintingMode ? '<p class="text-xs mt-2 font-bold italic text-gray-500">Event: Technopreneurship 5.0 • Booth BeByte</p>' : ''}</div>`;
+    const headerHtml = `<div class="mb-6 shrink-0 text-center md:text-left border-b-4 border-black pb-4"><h2 class="font-black text-4xl mb-1 uppercase text-bebyte-purple">Laporan Transaksi</h2><p class="text-sm font-bold text-gray-600">Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>${isPrintingMode ? `<p class="text-xs mt-2 font-bold italic text-gray-500">Event: ${CONFIG.EVENT_NAME} • Booth ${CONFIG.STORE_NAME}</p>` : ''}</div>`;
     const tableHeader = `<thead class="bg-gray-100 text-gray-600 text-xs uppercase font-bold text-left sticky top-0 z-10"><tr><th class="px-4 py-3 border-b-2 border-gray-200 bg-gray-100">Antrian</th><th class="px-4 py-3 border-b-2 border-gray-200 bg-gray-100">Waktu</th><th class="px-4 py-3 border-b-2 border-gray-200 bg-gray-100">Pembeli</th><th class="px-4 py-3 w-1/3 border-b-2 border-gray-200 bg-gray-100">Detail Item</th><th class="px-4 py-3 border-b-2 border-gray-200 bg-gray-100">Metode</th><th class="px-4 py-3 text-right border-b-2 border-gray-200 bg-gray-100">Total</th></tr></thead>`;
     const tableRows = currentData.map((tx, index) => {
         const itemsSummary = tx.items.map(i => `<div class="font-bold text-xs text-black whitespace-nowrap">• ${i.qty}x ${i.name}</div>`).join('');
@@ -420,5 +420,17 @@ document.getElementById('close-report').addEventListener('click', () => { playSo
 const statusDot = document.getElementById('status-dot');
 function updateOnlineStatus() { if (!statusDot) return; if (navigator.onLine) { statusDot.classList.remove('bg-red-600'); statusDot.classList.add('bg-green-500'); statusDot.title = "Online"; } else { statusDot.classList.remove('bg-green-500'); statusDot.classList.add('bg-red-600', 'animate-pulse'); statusDot.title = "OFFLINE!"; showAlert("KONEKSI PUTUS!", "Cek internet!"); } }
 window.addEventListener('online', updateOnlineStatus); window.addEventListener('offline', updateOnlineStatus); updateOnlineStatus();
+
+// --- HERO DARI CONFIG (data.js) ---
+(function bindHero() {
+    const ev = document.getElementById('hero-event');
+    const tag = document.getElementById('hero-tagline');
+    const ver = document.getElementById('hero-version');
+    const mas = document.getElementById('hero-mascot');
+    if (ev && CONFIG.EVENT_NAME) ev.textContent = CONFIG.EVENT_NAME;
+    if (tag && CONFIG.TAG_LINE) tag.textContent = CONFIG.TAG_LINE;
+    if (ver && CONFIG.VERSION) ver.textContent = `🦖 Est. ${CONFIG.VERSION}`;
+    if (mas && CONFIG.MASCOT) mas.src = CONFIG.MASCOT;
+})();
 
 renderMenu(); updateCart();

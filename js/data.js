@@ -1,6 +1,10 @@
 export const CONFIG = {
   WEBHOOK_URL: 'https://discordapp.com/api/webhooks/1549712999718064189/OruERz20gxzaYDHGLzBl6iDPa0tvtDhPCyrQTST_Q9Uuyx_XLJ9ioNjsxpcdcPyfFOPQ', 
   STORE_NAME: 'BeByte',
+  EVENT_NAME: 'Technopreneurship 5.0',
+  TAG_LINE: 'Semangat Baru',
+  VERSION: '2026',
+  MASCOT: 'assets/bebyte-mascot.png',
   ROLE_ID_DAPUR: '1549712082122055760' 
 };
 export const MENU = [
