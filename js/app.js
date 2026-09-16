@@ -1,7 +1,7 @@
 import { MENU, CONFIG } from './data.js';
 // UPDATE 1: Import restoreBackup dari report.js
-import { saveTransaction, getReport, clearReportData, downloadBackup, restoreBackup } from './report.js';
-import { sendToDiscord, sendOrderDone } from './discord.js';
+import { saveTransaction, getReport, clearReportData, downloadBackup, restoreBackup, payUnpaidTransaction, deleteTransaction } from './report.js';
+import { sendToDiscord, sendOrderDone, sendUnpaidOrder } from './discord.js';
 
 const fmt = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v);
 
@@ -47,6 +47,7 @@ localStorage.setItem('menu_stock', JSON.stringify(localMenu));
 let currentPaymentMethod = 'CASH';
 let currentTotalBill = 0;
 let currentQtyItem = null;
+let activeUnpaidId = localStorage.getItem('active_unpaid_id') || null; // hold UNPAID yg lagi dibuka di MY ORDER
 let reportPage = 1;
 const itemsPerPage = 5; 
 let isPrintingMode = false;
@@ -62,6 +63,7 @@ const els = {
   note: document.getElementById('note'),
   custName: document.getElementById('customer-name'),
   btnSend: document.getElementById('btn-send'),
+  btnSave: document.getElementById('btn-save'),
   alertModal: document.getElementById('custom-alert'),
   alertTitle: document.getElementById('alert-title'),
   alertMsg: document.getElementById('alert-msg'),
@@ -163,7 +165,8 @@ function addToCart(item, variantName, quantity = 1) {
     const badge = document.getElementById('cart-count');
     badge.classList.remove('animate-bounce-short'); void badge.offsetWidth; badge.classList.add('animate-bounce-short');
 }
-window.tryClearCart = () => { if(!cart.length && !els.custName.value.trim() && !els.note.value.trim()) return; showConfirm("HAPUS SEMUA?", "Yakin mau kosongin keranjang?", () => { cart = []; els.custName.value = ''; els.note.value = ''; updateCart(); }); };
+window.tryClearCart = () => { if(!cart.length && !els.custName.value.trim() && !els.note.value.trim()) return; showConfirm("HAPUS SEMUA?", "Yakin mau kosongin keranjang?", () => { cart = []; els.custName.value = ''; els.note.value = ''; cancelResume(); updateCart(); refreshNoteChips(); }); };
+function cancelResume() { activeUnpaidId = null; localStorage.removeItem('active_unpaid_id'); setResumeUI(null); }
 window.removeCartItem = (id, v) => { playSound('click'); cart = cart.filter(x => !(x.id === id && x.variant === (v === 'null' ? null : v))); updateCart(); };
 window.editCartQty = (id, v, currentQty) => { playSound('click'); const vKey = v === 'null' ? null : v; const item = cart.find(x => x.id === id && x.variant === vKey); if(item) { editingItemData = { id, vKey }; elsEdit.itemName.innerText = `Edit: ${item.nickname || item.name}`; elsEdit.input.value = currentQty; elsEdit.modal.classList.remove('hidden'); setTimeout(() => elsEdit.input.select(), 100); } };
 window.changeEditInput = (delta) => { playSound('click'); let val = parseInt(elsEdit.input.value) || 0; val += delta; if(val < 0) val = 0; elsEdit.input.value = val; };
@@ -196,6 +199,86 @@ function updateCashDisplay() {
         elsPay.btnFinal.classList.remove('opacity-50','cursor-not-allowed');
     }
 }
+
+// --- TOMBOL SAVE (DINE IN / UNPAID): masuk history + discord, bayar belakangan ---
+if (els.btnSave) els.btnSave.addEventListener('click', () => {
+    playSound('click');
+    if (activeUnpaidId) return showAlert("SUDAH DIBUKA", "Hold ini lagi dibuka di MY ORDER.\nTinggal CHECKOUT buat lunasi.");
+    if(!cart.length) return showAlert("KOSONG", "Pilih menu dulu!");
+    if(!els.custName.value.trim()) { els.custName.focus(); return showAlert("NAMA?", "Isi nama pemesan!"); }
+    const total = cart.reduce((a,b) => a + (b.price * b.qty), 0);
+    const itemsReport = cart.map(i => ({ ...i, name: i.nickname || i.name }));
+    const custName = els.custName.value.trim().toUpperCase();
+    const rawNote = els.note.value.trim();
+    const saveNote = rawNote;
+    const customerInfo = { name: custName, method: 'UNPAID', pay: 0, change: 0 };
+    const trxData = saveTransaction(itemsReport, total, saveNote, customerInfo, 'UNPAID');
+    if (trxData) {
+        sendUnpaidOrder(itemsReport, total, saveNote, trxData.queueNo, customerInfo).then(res => { if(!res.success) console.warn("Discord Log Fail"); });
+        playSound('success');
+        showAlert("TERSIMPAN! 🍽️", `ANTRIAN: #${trxData.queueNo}\nStatus: BELUM BAYAR\nKlik kotak #${trxData.queueNo} buat checkout.`);
+    }
+    cart = []; els.custName.value = ''; els.note.value = ''; updateCart(); renderUnpaidList(); refreshNoteChips();
+});
+
+// --- INDIKATOR RESUME HOLD UNPAID DI MY ORDER ---
+function setResumeUI(queueNo) {
+    if (els.btnSave) els.btnSave.disabled = !!queueNo;
+    if (els.btnSave) els.btnSave.classList.toggle('opacity-40', !!queueNo);
+    if (els.btnSave) els.btnSave.classList.toggle('cursor-not-allowed', !!queueNo);
+    if (els.btnSend) els.btnSend.innerHTML = queueNo ? `BAYAR #${queueNo} ➤` : 'CHECKOUT ➤';
+}
+
+// --- DAFTAR UNPAID (hold) ---
+function renderUnpaidList() {
+    const box = document.getElementById('unpaid-list');
+    const badge = document.getElementById('unpaid-count');
+    if (!box) return;
+    const data = getReport();
+    const list = (data.unpaid || []).slice().sort((a,b) => a.id - b.id);
+    if (badge) badge.textContent = `${list.length}`;
+    if (!list.length) { box.innerHTML = `<p class="col-span-3 text-center text-gray-400 text-xs font-bold italic py-4">Belum ada hold...</p>`; return; }
+    box.innerHTML = list.map(tx => {
+        const isActive = activeUnpaidId && String(activeUnpaidId) === String(tx.id);
+        return `<div onclick="resumeUnpaid('${tx.id}')" class="relative cursor-pointer border-2 ${isActive ? 'border-green-500 bg-green-50' : 'border-black bg-bebyte-yellow'} rounded-lg p-2 text-center shadow-[2px_2px_0px_0px_black] hover:translate-y-[1px] hover:shadow-[1px_1px_0px_0px_black] transition active:scale-95">
+            <button onclick="event.stopPropagation(); deleteUnpaid('${tx.id}')" class="absolute -top-2 -right-2 w-5 h-5 bg-red-600 text-white text-[10px] font-black rounded-full border border-black leading-none" title="Hapus hold">×</button>
+            <div class="font-black text-lg ${isActive ? 'text-green-700' : 'text-bebyte-purple'}">#${tx.queueNo || String(tx.id).slice(-4)}</div>
+            <div class="text-[10px] font-bold uppercase truncate">${tx.customer ? tx.customer.name : '-'}</div>
+            <div class="text-[10px] font-black">${fmt(tx.total)}</div>
+            ${isActive ? '<div class="text-[9px] font-black text-green-600">● DIBUKA</div>' : ''}
+        </div>`;
+    }).join('');
+}
+window.resumeUnpaid = (id) => {
+    playSound('click');
+    const data = getReport();
+    const tx = data.history.find(t => String(t.id) === String(id));
+    if (!tx) { renderUnpaidList(); return showAlert("GAGAL!", "Hold tidak ditemukan."); }
+    if (!cart.length) {
+        cart = (Array.isArray(tx.items) ? tx.items : []).map(i => ({ ...i }));
+    } else {
+        // Keranjang lagi isi: timpa aja biar ga kecampur sama hold lain
+        cart = (Array.isArray(tx.items) ? tx.items : []).map(i => ({ ...i }));
+    }
+    els.custName.value = tx.customer ? tx.customer.name : '';
+    els.note.value = (tx.note || '').replace(/,?\s*DINE IN\s*$/i, '');
+    activeUnpaidId = String(tx.id);
+    localStorage.setItem('active_unpaid_id', activeUnpaidId);
+    setResumeUI(tx.queueNo);
+    updateCart(); renderUnpaidList(); refreshNoteChips();
+    document.getElementById('cart-container').scrollIntoView({ behavior: 'smooth', block: 'start' });
+};
+window.deleteUnpaid = (id) => {
+    showConfirm("HAPUS HOLD?", "Hold UNPAID ini bakal dihapus permanen.", () => {
+        deleteTransaction(id);
+        if (activeUnpaidId && String(activeUnpaidId) === String(id)) cancelResume();
+        renderUnpaidList();
+    });
+};
+window.payUnpaidFromReport = (id) => {
+    els.modalReport.classList.add('hidden');
+    window.resumeUnpaid(id);
+};
 
 // --- PAYMENT METHOD SELECTION ---
 els.btnSend.addEventListener('click', () => { 
@@ -234,13 +317,19 @@ elsPay.btnFinal.addEventListener('click', async () => {
     const itemsReport = cart.map(i => ({ ...i, name: i.nickname || i.name })); 
     const customerInfo = { name: els.custName.value.trim().toUpperCase(), method: currentPaymentMethod, pay: cash, change: cash - currentTotalBill }; 
     
-    const trxData = saveTransaction(itemsReport, currentTotalBill, els.note.value, customerInfo); 
+    let trxData = null;
+    if (activeUnpaidId) {
+        // Lunasi hold UNPAID: update di tempat, queueNo tetap sama
+        trxData = payUnpaidTransaction(activeUnpaidId, itemsReport, currentTotalBill, els.note.value, customerInfo);
+    } else {
+        trxData = saveTransaction(itemsReport, currentTotalBill, els.note.value, customerInfo);
+    }
     if(trxData) {
         sendToDiscord(itemsReport, currentTotalBill, els.note.value, trxData.queueNo, customerInfo).then(res => { if(!res.success) console.warn("Discord Log Fail"); });
     }
     playSound('success'); elsPay.modal.classList.add('hidden'); 
     showAlert("LUNAS!", `ANTRIAN: #${trxData ? trxData.queueNo : '?'}\n${currentPaymentMethod === 'CASH' ? `Kembalian: ${fmt(customerInfo.change)}` : "QRIS Lunas!"}`); 
-    cart = []; els.custName.value = ''; els.note.value = ''; elsPay.btnFinal.disabled = false; elsPay.btnFinal.innerText = "BAYAR & KIRIM 🚀"; updateCart(); 
+    cart = []; els.custName.value = ''; els.note.value = ''; cancelResume(); elsPay.btnFinal.disabled = false; elsPay.btnFinal.innerText = "BAYAR & KIRIM 🚀"; updateCart(); renderUnpaidList(); refreshNoteChips();
 });
 elsPay.btnClose.addEventListener('click', () => { playSound('click'); elsPay.modal.classList.add('hidden'); });
 
@@ -263,14 +352,16 @@ function renderReportTable() {
     const tableRows = currentData.map((tx, index) => {
         const itemsSummary = tx.items.map(i => `<div class="font-bold text-xs text-black whitespace-nowrap">• ${i.qty}x ${i.name}</div>`).join('');
         const rowColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-        const methodBadge = tx.customer.method === 'QRIS' ? '<span class="text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded border border-blue-100">QRIS</span>' : '<span class="text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-100">TUNAI</span>';
+        const isUnpaidTx = tx.status === 'UNPAID' || (tx.customer && tx.customer.method === 'UNPAID');
+        const methodBadge = isUnpaidTx ? '<span class="text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">UNPAID</span>' : (tx.customer.method === 'QRIS' ? '<span class="text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded border border-blue-100">QRIS</span>' : '<span class="text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-100">TUNAI</span>');
         const noteDisplay = tx.note ? `<div class="text-[10px] text-gray-500 italic mt-1 truncate max-w-[150px]">"${tx.note}"</div>` : '';
         const queueDisplay = tx.queueNo ? `<span class="text-lg font-black">#${tx.queueNo}</span>` : `#${tx.id.toString().slice(-4)}`;
         const actionBtn = isPrintingMode ? '' : `<button onclick="notifyDone('${tx.queueNo || '?'}', '${tx.customer.name}')" class="mt-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-green-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">✅ PANGGIL</button>`;
+        const payBtn = (!isPrintingMode && isUnpaidTx) ? `<button onclick="payUnpaidFromReport('${tx.id}')" class="mt-1 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-red-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">💰 BAYAR</button>` : '';
         const receiptBtn = isPrintingMode ? '' : `<button onclick="printReceipt('${tx.id}')" class="mt-1 bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-black shadow active:scale-95 flex items-center gap-1 w-full justify-center">🧾 RESI 58mm</button>`;
-        return `<tr class="${rowColor} border-b border-gray-200 hover:bg-gray-100 transition group"><td class="px-4 py-3 text-bebyte-purple align-top text-center">${queueDisplay}${actionBtn}</td><td class="px-4 py-3 text-xs font-medium text-gray-500 align-top whitespace-nowrap">${new Date(tx.id).toLocaleTimeString('id-ID')}<br><span class="text-[10px]">${new Date(tx.id).toLocaleDateString('id-ID')}</span></td><td class="px-4 py-3 align-top"><div class="font-bold text-sm text-black uppercase truncate max-w-[120px]">${tx.customer.name}</div>${noteDisplay}</td><td class="px-4 py-3 align-top"><div class="max-h-[100px] overflow-y-auto custom-scroll pr-1">${itemsSummary}</div></td><td class="px-4 py-3 text-xs align-top">${methodBadge}</td><td class="px-4 py-3 text-sm font-bold text-black text-right align-top"><div>${fmt(tx.total)}</div>${receiptBtn}</td></tr>`;
+        return `<tr class="${rowColor} border-b border-gray-200 hover:bg-gray-100 transition group"><td class="px-4 py-3 text-bebyte-purple align-top text-center">${queueDisplay}${actionBtn}</td><td class="px-4 py-3 text-xs font-medium text-gray-500 align-top whitespace-nowrap">${new Date(tx.id).toLocaleTimeString('id-ID')}<br><span class="text-[10px]">${new Date(tx.id).toLocaleDateString('id-ID')}</span></td><td class="px-4 py-3 align-top"><div class="font-bold text-sm text-black uppercase truncate max-w-[120px]">${tx.customer.name}</div>${noteDisplay}</td><td class="px-4 py-3 align-top"><div class="max-h-[100px] overflow-y-auto custom-scroll pr-1">${itemsSummary}</div></td><td class="px-4 py-3 text-xs align-top text-center">${methodBadge}${payBtn}</td><td class="px-4 py-3 text-sm font-bold text-black text-right align-top"><div>${fmt(tx.total)}</div>${receiptBtn}</td></tr>`;
     }).join('');
-    const summaryHtml = `<div class="mt-8 pt-4 border-t-4 border-black grid grid-cols-2 gap-4 break-inside-avoid"><div><h3 class="font-black text-lg uppercase mb-2">Ringkasan Penjualan</h3><p class="text-sm font-bold text-gray-600">Total Transaksi: <span class="text-black text-lg">${data.totalTrx}</span></p></div><div class="text-right"><p class="text-sm font-bold text-gray-600 uppercase">Total Omset</p><h2 class="font-black text-4xl text-bebyte-purple">${fmt(data.totalOmset)}</h2></div></div>${isPrintingMode ? '<div class="mt-8 text-center text-xs font-bold text-gray-400">--- End of Report ---</div>' : ''}`;
+    const summaryHtml = `<div class="mt-8 pt-4 border-t-4 border-black grid grid-cols-2 gap-4 break-inside-avoid"><div><h3 class="font-black text-lg uppercase mb-2">Ringkasan Penjualan</h3><p class="text-sm font-bold text-gray-600">Total Transaksi: <span class="text-black text-lg">${data.totalTrx}</span></p>${(data.unpaidCount > 0) ? `<p class="text-sm font-bold text-red-600">Belum bayar: ${data.unpaidCount} (${fmt(data.unpaidTotal)})</p>` : ''}</div><div class="text-right"><p class="text-sm font-bold text-gray-600 uppercase">Total Omset</p><h2 class="font-black text-4xl text-bebyte-purple">${fmt(data.totalOmset)}</h2></div></div>${isPrintingMode ? '<div class="mt-8 text-center text-xs font-bold text-gray-400">--- End of Report ---</div>' : ''}`;
     const containerClass = isPrintingMode ? "" : "max-h-[50vh] overflow-y-auto custom-scroll border border-gray-200 rounded-lg";
     els.reportContent.innerHTML = `${headerHtml}<div class="${containerClass}"><table class="w-full">${tableHeader}<tbody>${tableRows || '<tr><td colspan="6" class="p-4 text-center text-gray-400">Belum ada data</td></tr>'}</tbody></table></div>${isPrintingMode ? summaryHtml : paginationControls}`;
 }
@@ -405,7 +496,39 @@ window.printReceipt = (id) => {
     window.addEventListener('afterprint', cleanup);
     setTimeout(() => { window.print(); setTimeout(() => { if (document.getElementById('tmp-receipt-page')) cleanup(); }, 1000); }, 100);
 };
-window.addNote = (text) => { playSound('click'); els.note.value = els.note.value ? `${els.note.value}, ${text}` : text; els.note.focus(); };
+function getNoteParts() { return els.note.value.split(',').map(s => s.trim()).filter(Boolean); }
+function refreshNoteChips() {
+    const parts = getNoteParts().map(p => p.toLowerCase());
+    document.querySelectorAll('#note-chips [data-note]').forEach(b => {
+        if (!b.dataset.label) b.dataset.label = b.textContent;
+        const active = parts.includes(b.dataset.note.toLowerCase());
+        b.textContent = active ? `✓ ${b.dataset.label}` : b.dataset.label;
+        b.classList.toggle('bg-bebyte-yellow', active);
+        b.classList.toggle('border-black', active);
+        b.classList.toggle('bg-white', !active);
+        b.classList.toggle('border-gray-400', !active);
+    });
+}
+// Toggle shortcut catatan: ketuk = tambah (centang), ketuk lagi = hapus. Takeaway ↔ Dine In saling menggantikan.
+window.toggleNote = (btn) => {
+    playSound('click');
+    const val = btn.dataset.note;
+    let parts = getNoteParts();
+    const idx = parts.findIndex(p => p.toLowerCase() === val.toLowerCase());
+    if (idx >= 0) { parts.splice(idx, 1); }
+    else {
+        const low = val.toLowerCase();
+        if (low.includes('takeaway')) parts = parts.filter(p => !p.toLowerCase().includes('dine in'));
+        else if (low.includes('dine in')) parts = parts.filter(p => !p.toLowerCase().includes('takeaway'));
+        parts.push(val);
+    }
+    els.note.value = parts.join(', ');
+    els.note.focus(); toggleNoteClear(); refreshNoteChips();
+};
+window.addNote = (text) => { playSound('click'); els.note.value = els.note.value ? `${els.note.value}, ${text}` : text; els.note.focus(); toggleNoteClear(); refreshNoteChips(); };
+window.clearNote = () => { playSound('click'); els.note.value = ''; els.note.focus(); toggleNoteClear(); refreshNoteChips(); };
+function toggleNoteClear() { const b = document.getElementById('note-clear'); if (b) b.classList.toggle('hidden', !els.note.value); }
+els.note.addEventListener('input', () => { toggleNoteClear(); refreshNoteChips(); });
 window.toggleFullscreen = () => { playSound('click'); if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>console.log(e)); else if (document.exitFullscreen) document.exitFullscreen(); };
 
 document.addEventListener('keydown', (e) => {
@@ -433,4 +556,16 @@ window.addEventListener('online', updateOnlineStatus); window.addEventListener('
     if (mas && CONFIG.MASCOT) mas.src = CONFIG.MASCOT;
 })();
 
-renderMenu(); updateCart();
+renderMenu(); updateCart(); renderUnpaidList(); refreshNoteChips();
+// Pulihkan indikator resume kalau reload saat hold lagi dibuka
+(function restoreResume() {
+    if (!activeUnpaidId) return;
+    try {
+        const data = getReport();
+        const tx = data.history.find(t => String(t.id) === String(activeUnpaidId));
+        const isUnpaid = tx && (tx.status === 'UNPAID' || (tx.customer && tx.customer.method === 'UNPAID'));
+        if (isUnpaid) setResumeUI(tx.queueNo);
+        else cancelResume();
+    } catch (e) { cancelResume(); }
+    renderUnpaidList();
+})();

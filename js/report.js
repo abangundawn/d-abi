@@ -1,6 +1,6 @@
 const STORAGE_KEY = 'bebyte_transaksi_log'; 
 
-export function saveTransaction(items, total, note, customerInfo) {
+export function saveTransaction(items, total, note, customerInfo, status = 'PAID') {
   try {
     // Antrian Harian
     let dailyCounter = parseInt(localStorage.getItem('daily_queue_counter') || '0');
@@ -16,7 +16,8 @@ export function saveTransaction(items, total, note, customerInfo) {
         items: items, 
         total: total, 
         note: note, 
-        customer: customerInfo 
+        customer: customerInfo,
+        status: status // 'PAID' atau 'UNPAID'
     };
 
     let history = [];
@@ -31,8 +32,12 @@ export function saveTransaction(items, total, note, customerInfo) {
 export function getReport() {
   try {
     const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    const totalOmset = history.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const isUnpaid = (tx) => (tx.status === 'UNPAID' || (tx.customer && tx.customer.method === 'UNPAID'));
+    const paidOnly = history.filter(tx => !isUnpaid(tx));
+    const unpaidOnly = history.filter(tx => isUnpaid(tx));
+    const totalOmset = paidOnly.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
     const totalTrx = history.length;
+    const unpaidTotal = unpaidOnly.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
     let itemCounts = {};
     history.forEach(tx => {
       if(Array.isArray(tx.items)) {
@@ -42,8 +47,30 @@ export function getReport() {
         });
       }
     });
-    return { totalOmset, totalTrx, itemCounts, history };
-  } catch (error) { return { totalOmset: 0, totalTrx: 0, itemCounts: {}, history: [] }; }
+    return { totalOmset, totalTrx, itemCounts, history, unpaidCount: unpaidOnly.length, unpaidTotal, unpaid: unpaidOnly };
+  } catch (error) { return { totalOmset: 0, totalTrx: 0, itemCounts: {}, history: [], unpaidCount: 0, unpaidTotal: 0, unpaid: [] }; }
+}
+
+// --- BARU: LUNASI TRANSAKSI UNPAID (pertahankan queueNo & id yang sama) ---
+export function payUnpaidTransaction(id, items, total, note, customerInfo) {
+  try {
+    const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const idx = history.findIndex(tx => String(tx.id) === String(id));
+    if (idx === -1) return null;
+    history[idx] = { ...history[idx], items, total, note, customer: customerInfo, status: 'PAID' };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    return history[idx];
+  } catch (error) { console.error("Gagal update:", error); return null; }
+}
+
+// --- BARU: HAPUS SATU TRANSAKSI (batalkan hold UNPAID) ---
+export function deleteTransaction(id) {
+  try {
+    const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const filtered = history.filter(tx => String(tx.id) !== String(id));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+    return true;
+  } catch (error) { console.error("Gagal hapus:", error); return false; }
 }
 
 export function clearReportData() {

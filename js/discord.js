@@ -16,7 +16,7 @@ export async function sendToDiscord(cart, total, note, queueNo, customerInfo) {
   const payload = {
     username: "BeByte Order",
     // 'content' berada di luar embeds agar bisa nge-PING orang
-    content: `🔔 **ORDER BARU!** ${mentionRole} tolong masak ya!`,
+    content: `🔔 **ORDER BARU!** ${mentionRole}`,
     embeds: [
       {
         title: `🔥 Pesanan Baru #${queueNo}`, // SUDAH DIPERBAIKI: Pakai queueNo (001), bukan timestamp
@@ -36,7 +36,39 @@ export async function sendToDiscord(cart, total, note, queueNo, customerInfo) {
   return sendPayload(payload);
 }
 
-// --- FUNGSI 2: KIRIM NOTIFIKASI SELESAI ---
+// --- FUNGSI 2: KIRIM ORDER SAVE/UNPAID (DINE IN, BELUM BAYAR) ---
+export async function sendUnpaidOrder(cart, total, note, queueNo, customerInfo) {
+  if (!CONFIG.WEBHOOK_URL) return { success: false };
+
+  let itemsList = cart.map(i => `• **${i.qty}x** ${i.name}`).join('\n');
+  if (!itemsList) itemsList = "Tanpa Item";
+  const safeNote = (note && note.trim().length > 0) ? note : "-";
+
+  const mentionRole = CONFIG.ROLE_ID_DAPUR ? `<@&${CONFIG.ROLE_ID_DAPUR}>` : "@here";
+
+  const payload = {
+    username: "BeByte Order",
+    content: `🔔 **ORDER DISIMPAN!** ${mentionRole}`,
+    embeds: [
+      {
+        title: `🍽️ Pesanan Disimpan #${queueNo}`,
+        description: `**Pelanggan:** ${customerInfo.name}`,
+        color: 15105570, // Orange (Unpaid)
+        fields: [
+          { name: "📦 Menu", value: itemsList.substring(0, 1024), inline: false },
+          { name: "📝 Catatan", value: safeNote.substring(0, 1024), inline: true },
+          { name: "💰 Status", value: "⏳ UNPAID / BELUM BAYAR", inline: true }
+        ],
+        footer: { text: `Masuk jam: ${new Date().toLocaleTimeString('id-ID')}` },
+        timestamp: new Date().toISOString()
+      }
+    ]
+  };
+
+  return sendPayload(payload);
+}
+
+// --- FUNGSI 3: KIRIM NOTIFIKASI SELESAI ---
 export async function sendOrderDone(queueNo, customerName) {
     if (!CONFIG.WEBHOOK_URL) return;
   
