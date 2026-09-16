@@ -1,31 +1,25 @@
+# BeByte — Aplikasi Web Kasir (Simple POS)
 
----
+BeByte adalah aplikasi kasir berbasis web untuk usaha F&B. Dibangun dengan **HTML**, **CSS**, dan **Vanilla JavaScript** — ringan, tanpa backend, data tersimpan di `localStorage` browser.
 
-# **BeByte — Aplikasi Web Kasir (Simple POS)**
+## ✨ Fitur Utama
 
-BeByte adalah aplikasi kasir berbasis web sederhana untuk usaha F&B. Dibangun menggunakan **HTML**, **CSS**, dan **Vanilla JavaScript**, aplikasi ini ringan, mudah digunakan, dan tidak memerlukan backend. Cukup buka **index.html**, dan sistem kasir langsung berjalan.
+* Katalog menu dengan gambar, varian, dan mode stok (tandai HABIS/ADA).
+* Keranjang + modal jumlah, edit/hapus item.
+* Nama pemesan (wajib) + catatan dapur dengan shortcut toggle (centang).
+* Tombol **SAVE** — simpan order sebagai hold **UNPAID**, bayar belakangan.
+* Kotak **UNPAID** — daftar hold per nomor antrian, klik untuk buka kembali di MY ORDER.
+* **CHECKOUT** — pembayaran CASH (numpad tablet + hitung kembalian) atau QRIS.
+* Dashboard admin: laporan transaksi, pagination, badge TUNAI/QRIS/UNPAID.
+* Tombol **PANGGIL** (notif Discord pesanan siap), **BAYAR** (lunasi hold), **FINISH** (tandai selesai ✅).
+* Print resi thermal **58mm** per transaksi + cetak laporan.
+* Backup/restore database via JSON.
+* Notifikasi Discord (order masuk, dine-in, pesanan selesai).
+* Identitas toko terpusat di `js/data.js` (nama, event, tagline, versi, maskot).
 
----
+## 📂 Struktur Proyek
 
-## **✨ Fitur Utama**
-
-* Daftar produk lengkap dengan gambar.
-* Tombol **Detail Produk** untuk melihat informasi tambahan.
-* Tambah ke keranjang, update jumlah, dan hapus item.
-* Perhitungan otomatis subtotal & total.
-* Checkout sederhana.
-* Manajemen data produk melalui `data.js`.
-* Integrasi opsional dengan Discord Webhook melalui `discord.js`.
-* Integrasi opsional dengan Discord Webhook melalui discord.js.  
-* Simpan orderan untuk yang bayar diakhir. pesanan boleh tetap diproses checkout belakangan. Pesanan terlama didahulukan.  
-* Tambahkan catatan disediakan shortcut atau ketik sendiri  
-* Bisa print resi jika pelanggan menginginkan  
-
----
-
-## **📂 Struktur Proyek**
-
-```
+```text
 /
 ├─ assets/
 │  ├─ bebyte-logo.png
@@ -35,76 +29,73 @@ BeByte adalah aplikasi kasir berbasis web sederhana untuk usaha F&B. Dibangun me
 │  ├─ eslumut.jpg
 │  ├─ stickymilk.jpg
 │  └─ ubiunguahh.jpg
-│
 ├─ css/
 │  └─ style.css
-│
 ├─ js/
-│  ├─ app.js
-│  ├─ data.js
-│  ├─ discord.js
-│  └─ report.js
-│
+│  ├─ app.js      # logika kasir, keranjang, pembayaran, resi
+│  ├─ data.js     # CONFIG + daftar menu
+│  ├─ discord.js  # kirim notif ke Discord webhook
+│  └─ report.js   # simpan/hitung laporan (localStorage)
 └─ index.html
 ```
 
----
+## 🚀 Cara Menjalankan
 
-## **🚀 Cara Menjalankan**
-
-1. Clone repo:
+Karena memakai ES module, jalankan lewat server lokal (jangan double-click `index.html`):
 
 ```bash
-git clone <repo-url>
+# di folder proyek
+python3 -m http.server 8888
+# lalu buka http://localhost:8888
 ```
 
-2. Buka folder proyek.
-2. ~~Jalankan dengan membuka ~~ ~~**index.html**~~ ~~ di browser.~~  
-3. ~~Tidak perlu server atau instalasi tambahan.~~ Sebaiknya gunakan server walau yang sederhana misal dengan `python3 -m http.server 8888` langsung di folder proyek atau gunakan [Simple web server](https://simplewebserver.org/)
+Alternatif: aplikasi [Simple Web Server](https://simplewebserver.org/) atau extension **Live Server** (auto-refresh saat pengembangan).
 
-Untuk pengembangan, gunakan extension **Live Server** agar auto-refresh.
+## 🔄 Alur Kasir
 
----
+1. Pilih menu → isi **nama pemesan** + catatan (opsional).
+2. **SAVE** kalau pelanggan bayar belakangan → masuk kotak UNPAID + dapur dapat notif Discord.
+3. Klik kotak `#antrian` di UNPAID untuk membuka kembali → **CHECKOUT** (CASH/QRIS).
+4. **PANGGIL** saat pesanan siap → pelanggan dapat notif Discord.
+5. **FINISH** saat pesanan diserahkan → tombol hilang, tinggal centang ✅.
 
-## **🛠️ Cara Mengubah Data Produk**
+## 🛠️ Ubah Menu & Identitas
 
 Edit `js/data.js`:
 
 ```js
+export const CONFIG = {
+  STORE_NAME: 'BeByte',
+  EVENT_NAME: 'Technopreneurship 5.0',
+  TAG_LINE: 'Semangat Baru',
+  VERSION: '2026',
+  MASCOT: 'assets/bebyte-mascot.png',
+  WEBHOOK_URL: 'https://discordapp.com/api/webhooks/...',
+  ROLE_ID_DAPUR: '...'
+};
+```
+
+Contoh menu dengan varian:
+
+```js
 {
-  id: 'p001',
+  id: 1,
   name: 'Lumpia Ubi Lumer',
-  price: 12000,
-  image: 'assets/ubiunguahh.jpg',
-  description: 'Lumpia ubi lumer coklat keju.'
+  price: 15000,
+  category: 'Food',
+  img: './assets/ubiunguahh.jpg',
+  active: true,
+  variants: [
+    { name: 'Coklat', nickname: 'CHUBI 🍫', desc: 'Isi coklat lumer', active: true },
+    { name: 'Keju', nickname: 'CHEUBI 🧀', desc: 'Isi keju gurih', active: true }
+  ]
 }
 ```
 
-Tambahkan objek baru untuk menambah menu.
+> Catatan: `WEBHOOK_URL` adalah kredensial privat — jangan commit URL asli ke repo publik, pakai URL webhook milik sendiri.
 
----
+## 📈 Pengembangan Selanjutnya
 
-## **🎨 Kustomisasi Tampilan**
-
-Semua style ada di:
-
-```
-css/style.css
-```
-
-Tema warna dapat disesuaikan, termasuk palet hijau untuk identitas BeByte.
-
----
-
-## **📈 Pengembangan Selanjutnya**
-
-* Sistem laporan transaksi otomatis.
 * Simpan data ke IndexedDB atau database server.
-* Cetak struk thermal printer.✅ done
 * Fitur login kasir & owner.
-* Integrasi pembayaran QRIS.
-
----
-
-
-
+* Mode offline penuh (PWA).
