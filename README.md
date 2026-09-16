@@ -100,7 +100,7 @@ Tema warna dapat disesuaikan, termasuk palet hijau untuk identitas BeByte.
 
 * Sistem laporan transaksi otomatis.
 * Simpan data ke IndexedDB atau database server.
-* Cetak struk thermal printer.
+* Cetak struk thermal printer.✅ done
 * Fitur login kasir & owner.
 * Integrasi pembayaran QRIS.
 
