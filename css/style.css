@@ -41,6 +41,30 @@ body {
 @keyframes popEffect { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
 .animate-pop { animation: popEffect 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
 
+/* --- RESI THERMAL 58mm (preview di layar) --- */
+.thermal-receipt {
+    width: 58mm;
+    max-width: 100%;
+    background: #fff;
+    color: #000;
+    margin: 0 auto;
+    padding: 0 1mm 2mm 4mm; /* kiri 4mm: geser dari area tak tercetak kolom 1-2 */
+    font-family: 'Courier New', Courier, monospace;
+    overflow: hidden;
+}
+.thermal-receipt pre {
+    font-family: inherit;
+    font-size: 11px;
+    line-height: 1.45;
+    white-space: pre; /* jangan auto-wrap, wrapping sudah diatur JS per 29 kolom */
+    overflow: hidden;
+    margin: 0;
+    color: #000;
+}
+.thermal-receipt pre b {
+    font-weight: 900;
+}
+
 /* --- PRINT STYLE (METODE CLONING) --- */
 @media print {
     @page { 
@@ -76,6 +100,18 @@ body {
     
     #print-area h2 { font-size: 24px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
     #print-area p { font-size: 12px; color: #555; }
+
+    /* Resi thermal: paksa lebar 58mm saat print */
+    #print-area .thermal-receipt {
+        width: 58mm !important;
+        margin: 0 !important;
+        padding: 0 1mm 0 4mm !important;
+    }
+    #print-area .thermal-receipt pre {
+        font-size: 10px !important;
+        line-height: 1.4 !important;
+        white-space: pre !important;
+    }
     
     button, .no-print { display: none !important; }
 }

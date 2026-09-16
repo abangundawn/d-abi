@@ -1,4 +1,4 @@
-import { MENU } from './data.js';
+import { MENU, CONFIG } from './data.js';
 // UPDATE 1: Import restoreBackup dari report.js
 import { saveTransaction, getReport, clearReportData, downloadBackup, restoreBackup } from './report.js';
 import { sendToDiscord, sendOrderDone } from './discord.js';
@@ -163,7 +163,7 @@ function addToCart(item, variantName, quantity = 1) {
     const badge = document.getElementById('cart-count');
     badge.classList.remove('animate-bounce-short'); void badge.offsetWidth; badge.classList.add('animate-bounce-short');
 }
-window.tryClearCart = () => { if(!cart.length) return; showConfirm("HAPUS SEMUA?", "Yakin mau kosongin keranjang?", () => { cart = []; updateCart(); }); };
+window.tryClearCart = () => { if(!cart.length && !els.custName.value.trim() && !els.note.value.trim()) return; showConfirm("HAPUS SEMUA?", "Yakin mau kosongin keranjang?", () => { cart = []; els.custName.value = ''; els.note.value = ''; updateCart(); }); };
 window.removeCartItem = (id, v) => { playSound('click'); cart = cart.filter(x => !(x.id === id && x.variant === (v === 'null' ? null : v))); updateCart(); };
 window.editCartQty = (id, v, currentQty) => { playSound('click'); const vKey = v === 'null' ? null : v; const item = cart.find(x => x.id === id && x.variant === vKey); if(item) { editingItemData = { id, vKey }; elsEdit.itemName.innerText = `Edit: ${item.nickname || item.name}`; elsEdit.input.value = currentQty; elsEdit.modal.classList.remove('hidden'); setTimeout(() => elsEdit.input.select(), 100); } };
 window.changeEditInput = (delta) => { playSound('click'); let val = parseInt(elsEdit.input.value) || 0; val += delta; if(val < 0) val = 0; elsEdit.input.value = val; };
@@ -240,7 +240,7 @@ elsPay.btnFinal.addEventListener('click', async () => {
     }
     playSound('success'); elsPay.modal.classList.add('hidden'); 
     showAlert("LUNAS!", `ANTRIAN: #${trxData ? trxData.queueNo : '?'}\n${currentPaymentMethod === 'CASH' ? `Kembalian: ${fmt(customerInfo.change)}` : "QRIS Lunas!"}`); 
-    cart = []; els.custName.value = ''; elsPay.btnFinal.disabled = false; elsPay.btnFinal.innerText = "BAYAR & KIRIM 🚀"; updateCart(); 
+    cart = []; els.custName.value = ''; els.note.value = ''; elsPay.btnFinal.disabled = false; elsPay.btnFinal.innerText = "BAYAR & KIRIM 🚀"; updateCart(); 
 });
 elsPay.btnClose.addEventListener('click', () => { playSound('click'); elsPay.modal.classList.add('hidden'); });
 
@@ -267,7 +267,8 @@ function renderReportTable() {
         const noteDisplay = tx.note ? `<div class="text-[10px] text-gray-500 italic mt-1 truncate max-w-[150px]">"${tx.note}"</div>` : '';
         const queueDisplay = tx.queueNo ? `<span class="text-lg font-black">#${tx.queueNo}</span>` : `#${tx.id.toString().slice(-4)}`;
         const actionBtn = isPrintingMode ? '' : `<button onclick="notifyDone('${tx.queueNo || '?'}', '${tx.customer.name}')" class="mt-2 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-green-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">✅ PANGGIL</button>`;
-        return `<tr class="${rowColor} border-b border-gray-200 hover:bg-gray-100 transition group"><td class="px-4 py-3 text-bebyte-purple align-top text-center">${queueDisplay}${actionBtn}</td><td class="px-4 py-3 text-xs font-medium text-gray-500 align-top whitespace-nowrap">${new Date(tx.id).toLocaleTimeString('id-ID')}<br><span class="text-[10px]">${new Date(tx.id).toLocaleDateString('id-ID')}</span></td><td class="px-4 py-3 align-top"><div class="font-bold text-sm text-black uppercase truncate max-w-[120px]">${tx.customer.name}</div>${noteDisplay}</td><td class="px-4 py-3 align-top"><div class="max-h-[100px] overflow-y-auto custom-scroll pr-1">${itemsSummary}</div></td><td class="px-4 py-3 text-xs align-top">${methodBadge}</td><td class="px-4 py-3 text-sm font-bold text-black text-right align-top">${fmt(tx.total)}</td></tr>`;
+        const receiptBtn = isPrintingMode ? '' : `<button onclick="printReceipt('${tx.id}')" class="mt-1 bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-black shadow active:scale-95 flex items-center gap-1 w-full justify-center">🧾 RESI 58mm</button>`;
+        return `<tr class="${rowColor} border-b border-gray-200 hover:bg-gray-100 transition group"><td class="px-4 py-3 text-bebyte-purple align-top text-center">${queueDisplay}${actionBtn}</td><td class="px-4 py-3 text-xs font-medium text-gray-500 align-top whitespace-nowrap">${new Date(tx.id).toLocaleTimeString('id-ID')}<br><span class="text-[10px]">${new Date(tx.id).toLocaleDateString('id-ID')}</span></td><td class="px-4 py-3 align-top"><div class="font-bold text-sm text-black uppercase truncate max-w-[120px]">${tx.customer.name}</div>${noteDisplay}</td><td class="px-4 py-3 align-top"><div class="max-h-[100px] overflow-y-auto custom-scroll pr-1">${itemsSummary}</div></td><td class="px-4 py-3 text-xs align-top">${methodBadge}</td><td class="px-4 py-3 text-sm font-bold text-black text-right align-top"><div>${fmt(tx.total)}</div>${receiptBtn}</td></tr>`;
     }).join('');
     const summaryHtml = `<div class="mt-8 pt-4 border-t-4 border-black grid grid-cols-2 gap-4 break-inside-avoid"><div><h3 class="font-black text-lg uppercase mb-2">Ringkasan Penjualan</h3><p class="text-sm font-bold text-gray-600">Total Transaksi: <span class="text-black text-lg">${data.totalTrx}</span></p></div><div class="text-right"><p class="text-sm font-bold text-gray-600 uppercase">Total Omset</p><h2 class="font-black text-4xl text-bebyte-purple">${fmt(data.totalOmset)}</h2></div></div>${isPrintingMode ? '<div class="mt-8 text-center text-xs font-bold text-gray-400">--- End of Report ---</div>' : ''}`;
     const containerClass = isPrintingMode ? "" : "max-h-[50vh] overflow-y-auto custom-scroll border border-gray-200 rounded-lg";
@@ -324,6 +325,86 @@ if (els.btnRestore && els.inputRestore) {
 
 // --- EXTRAS ---
 window.notifyDone = (qNo, cName) => { showConfirm("PANGGIL PEMBELI?", `Kirim notif ke Discord antrian #${qNo} selesai?`, () => { sendOrderDone(qNo, cName); playSound('success'); showAlert("TERKIRIM! 📢", `Notif #${qNo} sent.`); }); };
+// --- PRINT RESI THERMAL 58mm DARI HISTORY ---
+window.printReceipt = (id) => {
+    playSound('click');
+    const data = getReport();
+    const tx = data.history.find(t => String(t.id) === String(id));
+    if (!tx) return showAlert("GAGAL!", "Data transaksi tidak ditemukan.");
+    // Area cetak aman: kolom 3-30 (kolom 1-2 kepotong printer).
+    // Jadi lebar konten = 28, tiap baris dikasih 2 spasi di depan sebagai korban.
+    const W = 28;
+    const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const pad = (s) => '  ' + String(s).slice(0, W);
+    const cleanRp = (v) => fmt(Number(v) || 0).replace(/\u00A0/g, ' ');
+    const hr = (ch = '=') => esc(pad(ch.repeat(W)));
+    const center = (t) => { t = String(t).slice(0, W); const sp = Math.max(0, Math.floor((W - t.length) / 2)); return esc(pad(' '.repeat(sp) + t)); };
+    const centerBold = (t) => { t = String(t).slice(0, W); const sp = Math.max(0, Math.floor((W - t.length) / 2)); return '  ' + ' '.repeat(sp) + '<b>' + esc(t) + '</b>'; };
+    const row = (l, r) => { l = String(l); r = String(r); let space = W - l.length - r.length; if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; } return esc(pad(l + ' '.repeat(space) + r)); };
+    const rowBold = (l, r) => { l = String(l); r = String(r); let space = W - l.length - r.length; if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; } return '<b>' + esc(pad(l + ' '.repeat(space) + r)) + '</b>'; };
+    const rowRightBold = (l, r) => { l = String(l); r = String(r); let space = W - l.length - r.length; if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; } return esc('  ' + l + ' '.repeat(space)) + '<b>' + esc(r) + '</b>'; };
+    const wrap = (t, prefix = '') => { // bungkus teks panjang ke lebar W
+        const words = String(t).split(' '); const lines = []; let cur = prefix;
+        words.forEach(w => { if ((cur + (cur === prefix ? '' : ' ') + w).length > W) { lines.push(pad(cur)); cur = prefix + w; } else { cur = cur === prefix ? cur + w : cur + ' ' + w; } });
+        if (cur.trim()) lines.push(pad(cur)); return esc(lines.join('\n'));
+    };
+    const store = (CONFIG && CONFIG.STORE_NAME) ? CONFIG.STORE_NAME : 'BeByte';
+    const dateStr = tx.date || new Date(tx.id).toLocaleString('id-ID');
+    const custName = (tx.customer && tx.customer.name) ? tx.customer.name : '-';
+    const queueNo = tx.queueNo || String(tx.id).slice(-4);
+    const method = (tx.customer && tx.customer.method) ? tx.customer.method : 'CASH';
+    const total = Number(tx.total) || 0;
+    let pay = (tx.customer && tx.customer.pay != null) ? Number(tx.customer.pay) || 0 : 0;
+    let change = (tx.customer && tx.customer.change != null) ? Number(tx.customer.change) || 0 : 0;
+    if (method !== 'CASH') { pay = total; change = 0; } // QRIS lunas, abaikan data pay/change lama yg minus
+    const itemLines = (Array.isArray(tx.items) ? tx.items : []).map(i => {
+        const qty = Number(i.qty) || 0;
+        const nick = (i.nickname || i.name || 'ITEM').toString();
+        let variant = i.variant;
+        if (variant === 'null' || variant === null || variant === undefined) variant = '';
+        const line1raw = `${qty}x ${nick}${variant ? ` (${variant})` : ''}`.slice(0, W);
+        const lineTotal = (Number(i.price) || 0) * qty;
+        let line2;
+        if (qty > 1) line2 = row(`  @${cleanRp(i.price)}`, cleanRp(lineTotal));
+        else line2 = row(' ', cleanRp(lineTotal));
+        return `${esc(pad(line1raw))}\n${line2}`;
+    }).join('\n');
+    const nowPrint = new Date().toLocaleString('id-ID');
+    // Cust + Queue satu baris, nomor rata kanan mentok kolom 30, tebal, tanpa label "Queue:"
+    const custLeftRaw = `Cust:${custName}`.slice(0, W);
+    const queueRight = `#${queueNo}`;
+    let custQueueLine;
+    {
+        let l = custLeftRaw; const r = queueRight;
+        let space = W - l.length - r.length;
+        if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; }
+        custQueueLine = esc('  ' + l + ' '.repeat(space)) + '<b>' + esc(r) + '</b>';
+    }
+    let receiptHtml = '';
+    receiptHtml += centerBold(store) + '\n';
+    receiptHtml += hr('=') + '\n';
+    receiptHtml += wrap(`Date:${dateStr}`) + '\n';
+    receiptHtml += custQueueLine + '\n';
+    receiptHtml += hr('=') + '\n';
+    receiptHtml += itemLines + '\n';
+    receiptHtml += hr('-') + '\n';
+    receiptHtml += rowBold('Total:', cleanRp(total)) + '\n';
+    receiptHtml += row(`${method}:`, cleanRp(pay)) + '\n';
+    receiptHtml += row('Change:', cleanRp(change)) + '\n';
+    if (tx.note) receiptHtml += wrap(`Note:${tx.note}`) + '\n';
+    receiptHtml += center('Terima Kasih') + '\n';
+    receiptHtml += wrap(`ID:${tx.id}`) + '\n';
+    receiptHtml += wrap(`Print:${nowPrint}`) + '\n';
+    const printArea = document.getElementById('print-area');
+    printArea.innerHTML = `<div class="thermal-receipt"><pre>${receiptHtml}</pre></div>`;
+    // Override @page khusus resi 58mm (hapus otomatis setelah print)
+    let tmpStyle = document.getElementById('tmp-receipt-page');
+    if (!tmpStyle) { tmpStyle = document.createElement('style'); tmpStyle.id = 'tmp-receipt-page'; document.head.appendChild(tmpStyle); }
+    tmpStyle.innerHTML = '@media print { @page { size: 58mm auto; margin: 0; } }';
+    const cleanup = () => { printArea.innerHTML = ''; if (tmpStyle) tmpStyle.remove(); window.removeEventListener('afterprint', cleanup); };
+    window.addEventListener('afterprint', cleanup);
+    setTimeout(() => { window.print(); setTimeout(() => { if (document.getElementById('tmp-receipt-page')) cleanup(); }, 1000); }, 100);
+};
 window.addNote = (text) => { playSound('click'); els.note.value = els.note.value ? `${els.note.value}, ${text}` : text; els.note.focus(); };
 window.toggleFullscreen = () => { playSound('click'); if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(e=>console.log(e)); else if (document.exitFullscreen) document.exitFullscreen(); };
 

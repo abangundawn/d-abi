@@ -1,7 +1,7 @@
 export const CONFIG = {
-  WEBHOOK_URL: 'https://discord.com/api/webhooks/1441873588054392874/Po00YB_l7swxItydnfcvw6SGqKh3doxnfyIErmSln09k7nPyRAXcntZxuHnlW9ReXffF', 
+  WEBHOOK_URL: 'https://discordapp.com/api/webhooks/1549712999718064189/OruERz20gxzaYDHGLzBl6iDPa0tvtDhPCyrQTST_Q9Uuyx_XLJ9ioNjsxpcdcPyfFOPQ', 
   STORE_NAME: 'BeByte',
-  ROLE_ID_DAPUR: '1441874041576099963' 
+  ROLE_ID_DAPUR: '1549712082122055760' 
 };
 export const MENU = [
   { 
