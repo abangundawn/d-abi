@@ -16,10 +16,10 @@ export async function sendToDiscord(cart, total, note, queueNo, customerInfo) {
   const payload = {
     username: "BeByte Order",
     // 'content' berada di luar embeds agar bisa nge-PING orang
-    content: `🔔 **ORDER BARU!** ${mentionRole}`,
+    content: `🔔 **ORDER CHECKOUT!** ${mentionRole}`,
     embeds: [
       {
-        title: `🔥 Pesanan Baru #${queueNo}`, // SUDAH DIPERBAIKI: Pakai queueNo (001), bukan timestamp
+        title: `🔥 Checkout Pesanan #${queueNo}`, // SUDAH DIPERBAIKI: Pakai queueNo (001), bukan timestamp
         description: `**Pelanggan:** ${customerInfo.name}`,
         color: 16776960, // Kuning (Pending)
         fields: [
