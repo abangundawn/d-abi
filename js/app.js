@@ -1,6 +1,6 @@
 import { MENU, CONFIG } from './data.js';
 // UPDATE 1: Import restoreBackup dari report.js
-import { saveTransaction, getReport, clearReportData, downloadBackup, restoreBackup, payUnpaidTransaction, deleteTransaction } from './report.js';
+import { saveTransaction, getReport, clearReportData, downloadBackup, restoreBackup, payUnpaidTransaction, deleteTransaction, finishTransaction } from './report.js';
 import { sendToDiscord, sendOrderDone, sendUnpaidOrder } from './discord.js';
 
 const fmt = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v);
@@ -279,6 +279,13 @@ window.payUnpaidFromReport = (id) => {
     els.modalReport.classList.add('hidden');
     window.resumeUnpaid(id);
 };
+window.finishOrder = (id) => {
+    showConfirm("SELESAIKAN?", "Tandai pesanan ini sudah selesai & diserahkan ke pembeli?", () => {
+        finishTransaction(id);
+        playSound('success');
+        renderReportTable();
+    });
+};
 
 // --- PAYMENT METHOD SELECTION ---
 els.btnSend.addEventListener('click', () => { 
@@ -353,15 +360,18 @@ function renderReportTable() {
         const itemsSummary = tx.items.map(i => `<div class="font-bold text-xs text-black whitespace-nowrap">• ${i.qty}x ${i.name}</div>`).join('');
         const rowColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
         const isUnpaidTx = tx.status === 'UNPAID' || (tx.customer && tx.customer.method === 'UNPAID');
+        const isFinishedTx = !!tx.finished;
+        const doneMark = '<div class="mt-1 text-2xl leading-none">✅</div>';
         const methodBadge = isUnpaidTx ? '<span class="text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">UNPAID</span>' : (tx.customer.method === 'QRIS' ? '<span class="text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded border border-blue-100">QRIS</span>' : '<span class="text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-100">TUNAI</span>');
         const noteDisplay = tx.note ? `<div class="text-[10px] text-gray-500 italic mt-1 truncate max-w-[150px]">"${tx.note}"</div>` : '';
         const queueDisplay = tx.queueNo ? `<span class="text-lg font-black">#${tx.queueNo}</span>` : `#${tx.id.toString().slice(-4)}`;
-        const actionBtn = isPrintingMode ? '' : `<button onclick="notifyDone('${tx.queueNo || '?'}', '${tx.customer.name}')" class="mt-1 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-green-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">✅ PANGGIL</button>`;
+        const actionBtn = isPrintingMode ? '' : (isFinishedTx ? doneMark : `<button onclick="notifyDone('${tx.queueNo || '?'}', '${tx.customer.name}')" class="mt-1 bg-green-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-green-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">✅ PANGGIL</button>`);
         const payBtn = (!isPrintingMode && isUnpaidTx) ? `<button onclick="payUnpaidFromReport('${tx.id}')" class="mt-1 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-red-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">💰 BAYAR</button>` : '';
-        const receiptBtn = isPrintingMode ? '' : `<button onclick="printReceipt('${tx.id}')" class="mt-1 bg-gray-800 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-black shadow active:scale-95 flex items-center gap-1 w-full justify-center">🧾 RESI 58mm</button>`;
-        return `<tr class="${rowColor} border-b border-gray-200 hover:bg-gray-100 transition group"><td class="px-4 py-3 text-bebyte-purple align-top text-center"><div class="h-8 flex items-center justify-center">${queueDisplay}</div>${actionBtn}</td><td class="px-4 py-3 text-xs font-medium text-gray-500 align-top whitespace-nowrap">${new Date(tx.id).toLocaleTimeString('id-ID')}<br><span class="text-[10px]">${new Date(tx.id).toLocaleDateString('id-ID')}</span></td><td class="px-4 py-3 align-top"><div class="font-bold text-sm text-black uppercase truncate max-w-[120px]">${tx.customer.name}</div>${noteDisplay}</td><td class="px-4 py-3 align-top"><div class="max-h-[100px] overflow-y-auto custom-scroll pr-1">${itemsSummary}</div></td><td class="px-4 py-3 text-xs align-top text-center"><div class="h-8 flex items-center justify-center">${methodBadge}</div>${payBtn}</td><td class="px-4 py-3 text-sm font-bold text-black text-right align-top"><div class="h-8 flex items-center justify-end">${fmt(tx.total)}</div>${receiptBtn}</td></tr>`;
+        const finishBtn = (!isPrintingMode && !isUnpaidTx && !isFinishedTx) ? `<button onclick="finishOrder('${tx.id}')" class="mt-1 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded hover:bg-blue-500 shadow active:scale-95 flex items-center gap-1 w-full justify-center">🏁 FINISH</button>` : ((!isPrintingMode && isFinishedTx) ? doneMark : '');
+        const receiptBtn = isPrintingMode ? '' : `<button onclick="printReceipt('${tx.id}')" class="mt-1 bg-gray-800 text-white text-[9px] font-bold px-1 py-0.5 rounded hover:bg-black shadow active:scale-95 flex items-center gap-1 w-full justify-center">🧾 RESI</button>`;
+        return `<tr class="${rowColor} border-b border-gray-200 hover:bg-gray-100 transition group"><td class="px-4 py-3 text-bebyte-purple align-top text-center"><div class="h-8 flex items-center justify-center">${queueDisplay}</div>${actionBtn}</td><td class="px-4 py-3 text-xs font-medium text-gray-500 align-top whitespace-nowrap">${new Date(tx.id).toLocaleTimeString('id-ID')}<br><span class="text-[10px]">${new Date(tx.id).toLocaleDateString('id-ID')}</span></td><td class="px-4 py-3 align-top"><div class="font-bold text-sm text-black uppercase truncate max-w-[120px]">${tx.customer.name}</div>${noteDisplay}</td><td class="px-4 py-3 align-top"><div class="max-h-[100px] overflow-y-auto custom-scroll pr-1">${itemsSummary}</div></td><td class="px-4 py-3 text-xs align-top text-center"><div class="h-8 flex items-center justify-center">${methodBadge}</div>${payBtn}${finishBtn}</td><td class="px-4 py-3 text-sm font-bold text-black text-right align-top"><div class="h-8 flex items-center justify-end">${fmt(tx.total)}</div>${receiptBtn}</td></tr>`;
     }).join('');
-    const summaryHtml = `<div class="mt-8 pt-4 border-t-4 border-black grid grid-cols-2 gap-4 break-inside-avoid"><div><h3 class="font-black text-lg uppercase mb-2">Ringkasan Penjualan</h3><p class="text-sm font-bold text-gray-600">Total Transaksi: <span class="text-black text-lg">${data.totalTrx}</span></p>${(data.unpaidCount > 0) ? `<p class="text-sm font-bold text-red-600">Belum bayar: ${data.unpaidCount} (${fmt(data.unpaidTotal)})</p>` : ''}</div><div class="text-right"><p class="text-sm font-bold text-gray-600 uppercase">Total Omset</p><h2 class="font-black text-4xl text-bebyte-purple">${fmt(data.totalOmset)}</h2></div></div>${isPrintingMode ? '<div class="mt-8 text-center text-xs font-bold text-gray-400">--- End of Report ---</div>' : ''}`;
+    const summaryHtml = `<div class="mt-8 pt-4 border-t-4 border-black grid grid-cols-2 gap-4 break-inside-avoid"><div><h3 class="font-black text-lg uppercase mb-2">Ringkasan Penjualan</h3><p class="text-sm font-bold text-gray-600">Total Transaksi: <span class="text-black text-lg">${data.totalTrx}</span></p>${(data.unpaidCount > 0) ? `<p class="text-sm font-bold text-red-600">Belum bayar: ${data.unpaidCount} (${fmt(data.unpaidTotal)})</p>` : ''}${(data.finishedCount > 0) ? `<p class="text-sm font-bold text-green-600">Selesai: ${data.finishedCount}</p>` : ''}</div><div class="text-right"><p class="text-sm font-bold text-gray-600 uppercase">Total Omset</p><h2 class="font-black text-4xl text-bebyte-purple">${fmt(data.totalOmset)}</h2></div></div>${isPrintingMode ? '<div class="mt-8 text-center text-xs font-bold text-gray-400">--- End of Report ---</div>' : ''}`;
     const containerClass = isPrintingMode ? "" : "max-h-[50vh] overflow-y-auto custom-scroll border border-gray-200 rounded-lg";
     els.reportContent.innerHTML = `${headerHtml}<div class="${containerClass}"><table class="w-full">${tableHeader}<tbody>${tableRows || '<tr><td colspan="6" class="p-4 text-center text-gray-400">Belum ada data</td></tr>'}</tbody></table></div>${isPrintingMode ? summaryHtml : paginationControls}`;
 }

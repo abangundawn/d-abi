@@ -47,8 +47,8 @@ export function getReport() {
         });
       }
     });
-    return { totalOmset, totalTrx, itemCounts, history, unpaidCount: unpaidOnly.length, unpaidTotal, unpaid: unpaidOnly };
-  } catch (error) { return { totalOmset: 0, totalTrx: 0, itemCounts: {}, history: [], unpaidCount: 0, unpaidTotal: 0, unpaid: [] }; }
+    return { totalOmset, totalTrx, itemCounts, history, unpaidCount: unpaidOnly.length, unpaidTotal, unpaid: unpaidOnly, finishedCount: history.filter(tx => tx.finished).length };
+  } catch (error) { return { totalOmset: 0, totalTrx: 0, itemCounts: {}, history: [], unpaidCount: 0, unpaidTotal: 0, unpaid: [], finishedCount: 0 }; }
 }
 
 // --- BARU: LUNASI TRANSAKSI UNPAID (pertahankan queueNo & id yang sama) ---
@@ -61,6 +61,18 @@ export function payUnpaidTransaction(id, items, total, note, customerInfo) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
     return history[idx];
   } catch (error) { console.error("Gagal update:", error); return null; }
+}
+
+// --- BARU: TANDAI TRANSAKSI SELESAI (FINISH), status tetap PAID + flag finished ---
+export function finishTransaction(id) {
+  try {
+    const history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const idx = history.findIndex(tx => String(tx.id) === String(id));
+    if (idx === -1) return null;
+    history[idx] = { ...history[idx], finished: true };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+    return history[idx];
+  } catch (error) { console.error("Gagal finish:", error); return null; }
 }
 
 // --- BARU: HAPUS SATU TRANSAKSI (batalkan hold UNPAID) ---
