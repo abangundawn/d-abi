@@ -361,7 +361,7 @@ function renderReportTable() {
         const rowColor = index % 2 === 0 ? 'bg-white' : 'bg-gray-50';
         const isUnpaidTx = tx.status === 'UNPAID' || (tx.customer && tx.customer.method === 'UNPAID');
         const isFinishedTx = !!tx.finished;
-        const doneMark = '<div class="mt-1 text-2xl leading-none">✅</div>';
+        const doneMark = '<div class="mt-1 text-base leading-none text-center">✅</div>';
         const methodBadge = isUnpaidTx ? '<span class="text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">UNPAID</span>' : (tx.customer.method === 'QRIS' ? '<span class="text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded border border-blue-100">QRIS</span>' : '<span class="text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-100">TUNAI</span>');
         const noteDisplay = tx.note ? `<div class="text-[10px] text-gray-500 italic mt-1 truncate max-w-[150px]">"${tx.note}"</div>` : '';
         const queueDisplay = tx.queueNo ? `<span class="text-lg font-black">#${tx.queueNo}</span>` : `#${tx.id.toString().slice(-4)}`;
