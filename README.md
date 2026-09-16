@@ -60,7 +60,7 @@ git clone <repo-url>
 
 2. Buka folder proyek.
 2. ~~Jalankan dengan membuka ~~ ~~**index.html**~~ ~~ di browser.~~  
-3. ~~Tidak perlu server atau instalasi tambahan.~~ Sebaiknya gunakan server walau yang sederhana misal dengan python3 -m http.server 8888 langsung di folder proyek atau gunakan[ Simple web server](https://simplewebserver.org/ "https://simplewebserver.org/")  
+3. ~~Tidak perlu server atau instalasi tambahan.~~ Sebaiknya gunakan server walau yang sederhana misal dengan `python3 -m http.server 8888` langsung di folder proyek atau gunakan[ Simple web server](https://simplewebserver.org/ "https://simplewebserver.org/")  
 
 Untuk pengembangan, gunakan extension **Live Server** agar auto-refresh.
 
