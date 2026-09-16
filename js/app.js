@@ -562,7 +562,7 @@ window.addEventListener('online', updateOnlineStatus); window.addEventListener('
     const mas = document.getElementById('hero-mascot');
     if (ev && CONFIG.EVENT_NAME) ev.textContent = CONFIG.EVENT_NAME;
     if (tag && CONFIG.TAG_LINE) tag.textContent = CONFIG.TAG_LINE;
-    if (ver && CONFIG.VERSION) ver.textContent = `🦖 Est. ${CONFIG.VERSION}`;
+    if (ver && CONFIG.VERSION) ver.textContent = `🦖 ${CONFIG.VERSION}`;
     if (mas && CONFIG.MASCOT) mas.src = CONFIG.MASCOT;
 })();
 
