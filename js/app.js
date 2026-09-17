@@ -480,7 +480,7 @@ window.printReceipt = (id) => {
     const cleanRp = (v) => fmt(Number(v) || 0).replace(/\u00A0/g, ' ');
     const hr = (ch = '=') => esc(pad(ch.repeat(W)));
     const center = (t) => { t = String(t).slice(0, W); const sp = Math.max(0, Math.floor((W - t.length) / 2)); return esc(pad(' '.repeat(sp) + t)); };
-    const centerBold = (t) => { t = String(t).slice(0, W); const sp = Math.max(0, Math.floor((W - t.length) / 2)); return '  ' + ' '.repeat(sp) + '<b>' + esc(t) + '</b>'; };
+    const centerBold = (t) => { t = String(t).slice(0, W); const sp = Math.max(0, Math.floor((W - t.length) / 2)); const fs = t.length <= 16 ? 14 : (t.length <= 22 ? 12 : 10); return '  ' + ' '.repeat(sp) + `<span style="font-size:${fs}px;font-weight:900;">` + esc(t) + '</span>'; };
     const row = (l, r) => { l = String(l); r = String(r); let space = W - l.length - r.length; if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; } return esc(pad(l + ' '.repeat(space) + r)); };
     const rowBold = (l, r) => { l = String(l); r = String(r); let space = W - l.length - r.length; if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; } return '<b>' + esc(pad(l + ' '.repeat(space) + r)) + '</b>'; };
     const rowRightBold = (l, r) => { l = String(l); r = String(r); let space = W - l.length - r.length; if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; } return esc('  ' + l + ' '.repeat(space)) + '<b>' + esc(r) + '</b>'; };
