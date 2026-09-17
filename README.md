@@ -9,7 +9,8 @@ BeByte adalah aplikasi kasir berbasis web untuk usaha F&B. Dibangun dengan **HTM
 * Nama pemesan (wajib) + catatan dapur dengan shortcut toggle (centang).
 * Tombol **SAVE** — simpan order sebagai hold **UNPAID**, bayar belakangan.
 * Kotak **UNPAID** — daftar hold per nomor antrian, klik untuk buka kembali di MY ORDER.
-* **CHECKOUT** — pembayaran CASH (numpad tablet + hitung kembalian) atau QRIS.
+* **CHECKOUT** — pembayaran CASH (numpad tablet + hitung kembalian) atau QRIS dinamis.
+* **QRIS dinamis** — QR statis di `QRIS_STATIC` diubah otomatis mengikuti total (tanpa API perusahaan, murni konversi EMVCo + CRC16 di `js/qris.js`); tampil di modal checkout dan ikut tercetak di resi QRIS.
 * Dashboard admin: laporan transaksi, pagination, badge TUNAI/QRIS/UNPAID.
 * Tombol **PANGGIL** (notif Discord pesanan siap), **BAYAR** (lunasi hold), **FINISH** (tandai selesai ✅).
 * Print resi thermal **58mm** per transaksi + cetak laporan.
@@ -35,6 +36,7 @@ BeByte adalah aplikasi kasir berbasis web untuk usaha F&B. Dibangun dengan **HTM
 │  ├─ app.js      # logika kasir, keranjang, pembayaran, resi
 │  ├─ data.js     # CONFIG + daftar menu
 │  ├─ discord.js  # kirim notif ke Discord webhook
+│  ├─ qris.js     # statis → dinamis (EMVCo + CRC16)
 │  └─ report.js   # simpan/hitung laporan (localStorage)
 └─ index.html
 ```
@@ -70,10 +72,13 @@ export const CONFIG = {
   TAG_LINE: 'Semangat Baru',
   VERSION: '2026',
   MASCOT: 'assets/bebyte-mascot.png',
+  QRIS_STATIC: '00020101...6304XXXX', // QRIS statis merchant (hasil scan, bukan ketikan)
   WEBHOOK_URL: 'https://discordapp.com/api/webhooks/...',
   ROLE_ID_DAPUR: '...'
 };
 ```
+
+> Cara isi `QRIS_STATIC`: scan QRIS merchant pakai pemindai QR yang menampilkan teks mentah, lalu paste utuh — jangan ketik manual (salah 1 digit = dana nyasar). Nominal & CRC dihitung ulang otomatis oleh `js/qris.js` setiap transaksi.
 
 Contoh menu dengan varian:
 
