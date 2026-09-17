@@ -72,6 +72,8 @@ export const CONFIG = {
   TAG_LINE: 'Semangat Baru',
   VERSION: '2026',
   MASCOT: 'assets/bebyte-mascot.png',
+  LOGO: 'assets/bebyte-logo.png',
+  RECEIPT_FOOTER: 'Terima Kasih',
   QRIS_STATIC: '00020101...6304XXXX', // QRIS statis merchant (hasil scan, bukan ketikan)
   WEBHOOK_URL: 'https://discordapp.com/api/webhooks/...',
   ROLE_ID_DAPUR: '...'

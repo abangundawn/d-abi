@@ -38,6 +38,11 @@ export function getReport() {
     const totalOmset = paidOnly.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
     const totalTrx = history.length;
     const unpaidTotal = unpaidOnly.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
+    const _now = new Date();
+    const _isToday = (tx) => { const d = new Date(tx.id); return d.getFullYear() === _now.getFullYear() && d.getMonth() === _now.getMonth() && d.getDate() === _now.getDate(); };
+    const todayPaid = paidOnly.filter(_isToday);
+    const todayCount = todayPaid.length;
+    const todayOmset = todayPaid.reduce((acc, curr) => acc + (Number(curr.total) || 0), 0);
     let itemCounts = {};
     history.forEach(tx => {
       if(Array.isArray(tx.items)) {
@@ -47,8 +52,8 @@ export function getReport() {
         });
       }
     });
-    return { totalOmset, totalTrx, itemCounts, history, unpaidCount: unpaidOnly.length, unpaidTotal, unpaid: unpaidOnly, finishedCount: history.filter(tx => tx.finished).length };
-  } catch (error) { return { totalOmset: 0, totalTrx: 0, itemCounts: {}, history: [], unpaidCount: 0, unpaidTotal: 0, unpaid: [], finishedCount: 0 }; }
+    return { totalOmset, totalTrx, itemCounts, history, unpaidCount: unpaidOnly.length, unpaidTotal, unpaid: unpaidOnly, finishedCount: history.filter(tx => tx.finished).length, todayCount, todayOmset };
+  } catch (error) { return { totalOmset: 0, totalTrx: 0, itemCounts: {}, history: [], unpaidCount: 0, unpaidTotal: 0, unpaid: [], finishedCount: 0, todayCount: 0, todayOmset: 0 }; }
 }
 
 // --- BARU: LUNASI TRANSAKSI UNPAID (pertahankan queueNo & id yang sama) ---

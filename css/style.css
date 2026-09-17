@@ -106,6 +106,15 @@ body {
     #print-area h2 { font-size: 24px; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
     #print-area p { font-size: 12px; color: #555; }
 
+    /* Ringkasan: tumpuk 1 kolom + center biar utuh kepotong di kertas sempit (resi) */
+    #print-area .report-summary {
+        grid-template-columns: 1fr !important;
+        text-align: center !important;
+    }
+    #print-area .report-summary .text-right {
+        text-align: center !important;
+    }
+
     /* Resi thermal: paksa lebar 58mm saat print */
     #print-area .thermal-receipt {
         width: 58mm !important;
