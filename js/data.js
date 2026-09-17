@@ -1,12 +1,12 @@
 export const CONFIG = {
-  WEBHOOK_URL: 'https://discordapp.com/api/webhooks/1549712999718064189/OruERz20gxzaYDHGLzBl6iDPa0tvtDhPCyrQTST_Q9Uuyx_XLJ9ioNjsxpcdcPyfFOPQ', 
-  STORE_NAME: 'BeByte',
-  EVENT_NAME: 'Technopreneurship 5.0',
-  TAG_LINE: 'Semangat Baru',
+  WEBHOOK_URL: 'https://discordapp.com/api/webhooks/1549895161906077799/PB7O4Lw3CitpgRKAJFhgeW8-XR0iQrWiLC7XiM-2H8r0nzuDkQcqMAnBiybKtgRGPT96', 
+  STORE_NAME: 'D`Abi Coffe & Resto',
+  EVENT_NAME: 'Testing D-Abi FnB PoS',
+  TAG_LINE: 'Semangat Baru - https://github.com/darojatun/d-abi',
   VERSION: '2026',
-  MASCOT: 'assets/bebyte-mascot.png',
-  LOGO: 'assets/bebyte-logo.png',
-  RECEIPT_FOOTER: 'Terima Kasih',
+  MASCOT: 'assets/d-abi.dc.qr.square.png',
+  LOGO: 'assets/d-abi-logo.png',
+  RECEIPT_FOOTER: '-= Terima Kasih =-',
   QRIS_STATIC: '00020101021126570011ID.DANA.WWW011893600915303412044302090341204430303UMI51440014ID.CO.QRIS.WWW0215ID10265714866570303UMI5204899953033605802ID5911BLUE MATRIX6015Kota Padang Sid61052271163042C9C',
   ROLE_ID_DAPUR: '1549712082122055760' 
 };
