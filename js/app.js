@@ -2,6 +2,7 @@ import { MENU, CONFIG } from './data.js';
 // UPDATE 1: Import restoreBackup dari report.js
 import { saveTransaction, getReport, clearReportData, downloadBackup, restoreBackup, payUnpaidTransaction, deleteTransaction, finishTransaction } from './report.js';
 import { sendToDiscord, sendOrderDone, sendUnpaidOrder } from './discord.js';
+import { qrisStaticToDynamic } from './qris.js';
 
 const fmt = (v) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(v);
 
@@ -87,7 +88,8 @@ const els = {
 const elsPay = {
     modal: document.getElementById('modal-payment'), total: document.getElementById('pay-total'), inputCash: document.getElementById('input-cash'),
     textChange: document.getElementById('text-change'), btnFinal: document.getElementById('btn-final-pay'), btnClose: document.getElementById('close-payment'),
-    grpCash: document.getElementById('cash-input-group'), btnCash: document.getElementById('btn-cash'), btnQris: document.getElementById('btn-qris')
+    grpCash: document.getElementById('cash-input-group'), btnCash: document.getElementById('btn-cash'), btnQris: document.getElementById('btn-qris'),
+    grpQr: document.getElementById('qris-qr-group'), qrBox: document.getElementById('qris-qr-box'), qrAmount: document.getElementById('qris-qr-amount')
 };
 
 const elsQty = {
@@ -261,7 +263,7 @@ window.resumeUnpaid = (id) => {
         cart = (Array.isArray(tx.items) ? tx.items : []).map(i => ({ ...i }));
     }
     els.custName.value = tx.customer ? tx.customer.name : '';
-    els.note.value = (tx.note || '').replace(/,?\s*DINE IN\s*$/i, '');
+    els.note.value = (tx.note || '').split(',').map(s => s.trim()).filter(s => s && !/^tolong masak ya!?$/i.test(s)).join(', ').replace(/,?\s*DINE IN\s*$/i, '');
     activeUnpaidId = String(tx.id);
     localStorage.setItem('active_unpaid_id', activeUnpaidId);
     setResumeUI(tx.queueNo);
@@ -295,6 +297,7 @@ els.btnSend.addEventListener('click', () => {
     currentTotalBill = cart.reduce((a,b) => a + (b.price * b.qty), 0); 
     elsPay.total.innerText = fmt(currentTotalBill); 
     tempCashString = ""; updateCashDisplay();
+    renderQrisQr();
     setMethod('CASH'); elsPay.modal.classList.remove('hidden'); 
 });
 
@@ -306,14 +309,51 @@ window.setMethod = (type) => {
         elsPay.btnCash.className = "border-2 border-black py-2 rounded font-bold bg-bebyte-yellow ring-2 ring-black ring-offset-2 transition-all"; 
         elsPay.btnQris.className = "border-2 border-black py-2 rounded font-bold bg-white hover:bg-gray-100 transition-all"; 
         elsPay.grpCash.classList.remove('hidden'); 
+        if (elsPay.grpQr) elsPay.grpQr.classList.add('hidden');
     } 
     else { 
         elsPay.btnQris.className = "border-2 border-black py-2 rounded font-bold bg-bebyte-yellow ring-2 ring-black ring-offset-2 transition-all"; 
         elsPay.btnCash.className = "border-2 border-black py-2 rounded font-bold bg-white hover:bg-gray-100 transition-all"; 
         elsPay.grpCash.classList.add('hidden'); 
+        if (elsPay.grpQr) elsPay.grpQr.classList.remove('hidden');
+        renderQrisQr();
     }
     updateCashDisplay();
 };
+
+// --- QR DINAMIS SESUAI TOTAL (gantikan keypad saat QRIS) ---
+function currentQrisPayload() {
+    if (!CONFIG.QRIS_STATIC) return null;
+    return qrisStaticToDynamic(CONFIG.QRIS_STATIC, currentTotalBill);
+}
+function renderQrisQr() {
+    if (!elsPay.qrBox) return;
+    if (elsPay.qrAmount) elsPay.qrAmount.textContent = fmt(currentTotalBill);
+    const dyn = currentQrisPayload();
+    elsPay.qrBox.innerHTML = '';
+    elsPay.qrBox.dataset.payload = dyn || '';
+    if (!dyn) { elsPay.qrBox.innerHTML = '<p class="text-xs font-bold text-red-600 p-4">QRIS belum dikonfigurasi</p>'; return; }
+    try {
+        if (typeof qrcode === 'undefined') throw new Error('lib qr belum termuat');
+        const qr = qrcode(0, 'M'); qr.addData(dyn); qr.make();
+        elsPay.qrBox.innerHTML = qr.createSvgTag(6, 0);
+        const svg = elsPay.qrBox.querySelector('svg');
+        if (svg) { svg.setAttribute('width', '200'); svg.setAttribute('height', '200'); }
+    } catch (e) {
+        console.warn('QR render fail:', e);
+        elsPay.qrBox.innerHTML = '<p class="text-xs font-bold text-red-600 p-4">Gagal bikin QR,<br>pakai nominal manual</p>';
+    }
+}
+function qrisQrDataUrlFor(amount, cellSize = 4) {
+    if (!CONFIG.QRIS_STATIC) return null;
+    const dyn = qrisStaticToDynamic(CONFIG.QRIS_STATIC, amount);
+    if (!dyn) return null;
+    try {
+        if (typeof qrcode === 'undefined') return null;
+        const qr = qrcode(0, 'M'); qr.addData(dyn); qr.make();
+        return qr.createDataURL(cellSize, 0);
+    } catch (e) { console.warn('QR print fail:', e); return null; }
+}
 
 elsPay.btnFinal.addEventListener('click', async () => { 
     const cash = Number(tempCashString) || 0; 
@@ -457,7 +497,8 @@ window.printReceipt = (id) => {
     const total = Number(tx.total) || 0;
     let pay = (tx.customer && tx.customer.pay != null) ? Number(tx.customer.pay) || 0 : 0;
     let change = (tx.customer && tx.customer.change != null) ? Number(tx.customer.change) || 0 : 0;
-    if (method !== 'CASH') { pay = total; change = 0; } // QRIS lunas, abaikan data pay/change lama yg minus
+    const isUnpaidTx = (tx.status === 'UNPAID' || method === 'UNPAID');
+    if (method === 'QRIS') { pay = total; change = 0; } // QRIS lunas, abaikan data pay/change lama yg minus
     const itemLines = (Array.isArray(tx.items) ? tx.items : []).map(i => {
         const qty = Number(i.qty) || 0;
         const nick = (i.nickname || i.name || 'ITEM').toString();
@@ -481,23 +522,35 @@ window.printReceipt = (id) => {
         if (space < 1) { l = l.slice(0, W - r.length - 1); space = 1; }
         custQueueLine = esc('  ' + l + ' '.repeat(space)) + '<b>' + esc(r) + '</b>';
     }
-    let receiptHtml = '';
-    receiptHtml += centerBold(store) + '\n';
-    receiptHtml += hr('=') + '\n';
-    receiptHtml += wrap(`Date:${dateStr}`) + '\n';
-    receiptHtml += custQueueLine + '\n';
-    receiptHtml += hr('=') + '\n';
-    receiptHtml += itemLines + '\n';
-    receiptHtml += hr('-') + '\n';
-    receiptHtml += rowBold('Total:', cleanRp(total)) + '\n';
-    receiptHtml += row(`${method}:`, cleanRp(pay)) + '\n';
-    receiptHtml += row('Change:', cleanRp(change)) + '\n';
-    if (tx.note) receiptHtml += wrap(`Note:${tx.note}`) + '\n';
-    receiptHtml += center('Terima Kasih') + '\n';
-    receiptHtml += wrap(`ID:${tx.id}`) + '\n';
-    receiptHtml += wrap(`Print:${nowPrint}`) + '\n';
+    let receiptTop = '';
+    receiptTop += centerBold(store) + '\n';
+    receiptTop += hr('=') + '\n';
+    receiptTop += wrap(`Date:${dateStr}`) + '\n';
+    receiptTop += custQueueLine + '\n';
+    receiptTop += hr('=') + '\n';
+    receiptTop += itemLines + '\n';
+    receiptTop += hr('-') + '\n';
+    receiptTop += rowBold('Total:', cleanRp(total)) + '\n';
+    const isQrisPaid = !isUnpaidTx && method === 'QRIS';
+    if (isUnpaidTx) {
+        receiptTop += row('Status:', 'BELUM BAYAR') + '\n';
+    } else if (!isQrisPaid) {
+        receiptTop += row(`${method}:`, cleanRp(pay)) + '\n';
+        receiptTop += row('Change:', cleanRp(change)) + '\n';
+    }
+    // QRIS lunas: QR dinamis dicetak, tanpa baris bayar/kembalian
+    let qrBlock = '';
+    if (isQrisPaid) {
+        const qrUrl = qrisQrDataUrlFor(total);
+        if (qrUrl) qrBlock = `<div style="padding-left:12px;margin:2px 0;"><img src="${qrUrl}" style="width:168px;height:168px;image-rendering:pixelated;display:block;"></div>`;
+    }
+    let receiptBottom = '';
+    if (tx.note) receiptBottom += wrap(`Note:${tx.note}`) + '\n';
+    receiptBottom += center('Terima Kasih') + '\n';
+    receiptBottom += wrap(`ID:${tx.id}`) + '\n';
+    receiptBottom += wrap(`Print:${nowPrint}`) + '\n';
     const printArea = document.getElementById('print-area');
-    printArea.innerHTML = `<div class="thermal-receipt"><pre>${receiptHtml}</pre></div>`;
+    printArea.innerHTML = `<div class="thermal-receipt"><pre>${receiptTop}</pre>${qrBlock}<pre>${receiptBottom}</pre></div>`;
     // Override @page khusus resi 58mm (hapus otomatis setelah print)
     let tmpStyle = document.getElementById('tmp-receipt-page');
     if (!tmpStyle) { tmpStyle = document.createElement('style'); tmpStyle.id = 'tmp-receipt-page'; document.head.appendChild(tmpStyle); }
@@ -562,6 +615,7 @@ window.addEventListener('online', updateOnlineStatus); window.addEventListener('
     const mas = document.getElementById('hero-mascot');
     if (ev && CONFIG.EVENT_NAME) ev.textContent = CONFIG.EVENT_NAME;
     if (tag && CONFIG.TAG_LINE) tag.textContent = CONFIG.TAG_LINE;
+    if (CONFIG.STORE_NAME) document.title = `${CONFIG.STORE_NAME} - Order System`;
     if (ver && CONFIG.VERSION) ver.textContent = `🦖 ${CONFIG.VERSION}`;
     if (mas && CONFIG.MASCOT) mas.src = CONFIG.MASCOT;
 })();

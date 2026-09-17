@@ -14,7 +14,7 @@ export async function sendToDiscord(cart, total, note, queueNo, customerInfo) {
   const mentionRole = CONFIG.ROLE_ID_DAPUR ? `<@&${CONFIG.ROLE_ID_DAPUR}>` : "@here";
 
   const payload = {
-    username: "BeByte Order",
+    username: `${CONFIG.STORE_NAME} Order`,
     // 'content' berada di luar embeds agar bisa nge-PING orang
     content: `🔔 **ORDER CHECKOUT!** ${mentionRole}`,
     embeds: [
@@ -47,7 +47,7 @@ export async function sendUnpaidOrder(cart, total, note, queueNo, customerInfo) 
   const mentionRole = CONFIG.ROLE_ID_DAPUR ? `<@&${CONFIG.ROLE_ID_DAPUR}>` : "@here";
 
   const payload = {
-    username: "BeByte Order",
+    username: `${CONFIG.STORE_NAME} Order`,
     content: `🔔 **ORDER DISIMPAN!** ${mentionRole}`,
     embeds: [
       {
@@ -73,7 +73,7 @@ export async function sendOrderDone(queueNo, customerName) {
     if (!CONFIG.WEBHOOK_URL) return;
   
     const payload = {
-      username: "BeByte Kitchen",
+      username: `${CONFIG.STORE_NAME} Kitchen`,
       content: `✅ **PESANAN SELESAI!**`,
       embeds: [
         {
