@@ -607,6 +607,11 @@ const statusDot = document.getElementById('status-dot');
 function updateOnlineStatus() { if (!statusDot) return; if (navigator.onLine) { statusDot.classList.remove('bg-red-600'); statusDot.classList.add('bg-green-500'); statusDot.title = "Online"; } else { statusDot.classList.remove('bg-green-500'); statusDot.classList.add('bg-red-600', 'animate-pulse'); statusDot.title = "OFFLINE!"; showAlert("KONEKSI PUTUS!", "Cek internet!"); } }
 window.addEventListener('online', updateOnlineStatus); window.addEventListener('offline', updateOnlineStatus); updateOnlineStatus();
 
+// --- PWA: daftarkan Service Worker (https/localhost saja) ---
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW fail', e)); });
+}
+
 // --- HERO DARI CONFIG (data.js) ---
 (function bindHero() {
     const ev = document.getElementById('hero-event');
